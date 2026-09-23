@@ -9,7 +9,8 @@
 <body><canvas id="game"></canvas><div id="hud"><div id="help">WASD / 방향키 이동 · 마우스 조준 · 클릭 사격 · J 근접 · K 해킹 · Space 대시 · E 줍기 · I 장비</div><div id="top"><div class="card" id="stats"><div class="brand">CYBER CITY · LOW-01</div><div id="hpText">HP 100 / 100</div><div class="meter"><i id="hpBar"></i></div><div class="sub" id="equipment">PX-0 권총 · 장비 없음</div></div><div class="card" id="rightinfo">고철 <b id="scrap">0</b><br><span class="sub" id="kills">처치 0 · 웨이브 1</span></div></div><div class="toolbar"><button id="lootButton">줍기 E</button><button id="inventoryButton">장비 I</button></div><div class="card" id="message"></div><div id="bottom"><div class="stick" id="stick"><div class="knob" id="knob"></div></div><div class="buttons"><button id="swap">무기<small>Q</small></button><button id="hack">해킹<small>K</small></button><button id="dash">대시<small>Space</small></button><button class="attack" id="shoot">사격<small>클릭</small></button><button id="melee">근접<small>J</small></button><button id="interact">줍기<small>E</small></button></div></div><div id="inventory" class="inventory"><button class="close" id="closeInventory">닫기 ×</button><h2>장비 · 조합</h2><p>드롭한 모듈과 사이버웨어를 장착해 효과를 연결하세요. 무기는 두 개까지 장착하고 전투 중 교체할 수 있습니다.</p><div id="inventoryContent"></div></div><div id="respawn"><div class="card"><h2>신호 소실</h2><p>LOW-01 은신처로 복귀합니다.</p><div id="timer">3</div><button id="respawnButton" disabled>리스폰</button></div></div></div>
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js";
-(()=>{'use strict';
+const canUse3D=(()=>{try{return !!(document.createElement('canvas').getContext('webgl2')||document.createElement('canvas').getContext('webgl'))}catch{return false}})();
+if(canUse3D){(()=>{'use strict';
 const canvas=document.querySelector('#game');let W=0,H=0;
 const $=s=>document.querySelector(s), world={w:1500,h:1100}, camera={x:0,y:0};
 const walls=[{x:90,y:110,w:240,h:110},{x:480,y:95,w:200,h:135},{x:860,y:90,w:290,h:105},{x:1190,y:175,w:170,h:220},{x:160,y:360,w:125,h:230},{x:375,y:410,w:235,h:110},{x:750,y:360,w:130,h:240},{x:1000,y:450,w:250,h:105},{x:90,y:780,w:290,h:145},{x:535,y:780,w:145,h:220},{x:815,y:805,w:270,h:130},{x:1210,y:730,w:150,h:245}];
@@ -117,5 +118,5 @@ ring.rotation.z=time*.13;renderer.render(scene,view)}
 
 resize();
 let prev=performance.now();function frame(now){let dt=Math.min(.034,(now-prev)/1000);prev=now;update(dt);draw();requestAnimationFrame(frame)}for(let i=0;i<5;i++)spawnEnemy();renderInventory();notice('LOW-01 · 적을 처치하고 부품을 수집해');requestAnimationFrame(frame);
-})();
+})();}else{const fallback=document.createElement('script');fallback.src='./fallback2d.js';document.body.append(fallback)}
 </script></body></html>
