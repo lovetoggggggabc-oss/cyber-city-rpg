@@ -118,5 +118,5 @@ ring.rotation.z=time*.13;renderer.render(scene,view)}
 
 resize();
 let prev=performance.now();function frame(now){let dt=Math.min(.034,(now-prev)/1000);prev=now;update(dt);draw();requestAnimationFrame(frame)}for(let i=0;i<5;i++)spawnEnemy();renderInventory();notice('LOW-01 · 적을 처치하고 부품을 수집해');requestAnimationFrame(frame);
-})();}else{const fallback=document.createElement('script');fallback.src='./fallback2d.js';document.body.append(fallback)}
+})();}else{const fallback=document.createElement('script');fallback.src='./fallback2d.js?v=perspective3d-1';document.body.append(fallback)}
 </script></body></html>
