@@ -2,11 +2,20 @@
 (()=>{'use strict';
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');let W=0,H=0,dpr=1;
 const $=s=>document.querySelector(s), world={w:1500,h:1100};
-const walls=[{x:90,y:110,w:240,h:110},{x:480,y:95,w:200,h:135},{x:860,y:90,w:290,h:105},{x:1190,y:175,w:170,h:220},{x:160,y:360,w:125,h:230},{x:375,y:410,w:235,h:110},{x:750,y:360,w:130,h:240},{x:1000,y:450,w:250,h:105},{x:90,y:780,w:290,h:145},{x:535,y:780,w:145,h:220},{x:815,y:805,w:270,h:130},{x:1210,y:730,w:150,h:245}];
-const safe={x:680,y:655,r:125};
+const buildingShapes=[
+ [{x:290,y:320,w:310,h:105},{x:290,y:425,w:145,h:125}],
+ [{x:730,y:240,w:305,h:67},{x:730,y:307,w:120,h:100},{x:950,y:307,w:85,h:100}],
+ [{x:710,y:490,w:85,h:90}],
+ [{x:610,y:635,w:250,h:105},{x:610,y:740,w:110,h:80}],
+ [{x:380,y:680,w:80,h:140},{x:270,y:820,w:190,h:130}],
+ [{x:1050,y:550,w:160,h:150}]
+];
+const walls=buildingShapes.flatMap((parts,id)=>parts.map(part=>({...part,id})));
+const safe={x:320,y:760,r:42};
+const start={x:540,y:870};
 const defs={conduct:{name:'전도성 탄창',type:'mod',desc:'5번째 탄환이 감전 부여'},serrated:{name:'톱니 탄환',type:'mod',desc:'치명타 시 출혈 부여'},powder:{name:'불량 화약',type:'mod',desc:'총기 피해 +20%'},regen:{name:'재생 회로',type:'cyber',desc:'처치 시 체력 2 회복'},reflex:{name:'반사 신경제어기',type:'cyber',desc:'대시 후 1초간 연사 +30%'},overload:{name:'과부하 칩',type:'chip',desc:'해킹 시 감전 부여'},battery:{name:'폐기형 전력 코어',type:'core',desc:'감전된 적에게 피해 +15%'},ignite:{name:'점화 탄창',type:'mod',desc:'샷건 근접 사격 시 화상'},thruster:{name:'긴급 추진기',type:'cyber',desc:'대시 후 다음 공격 피해 +25%'},heat:{name:'열회수 코어',type:'core',desc:'화상 적 처치 시 대시 재사용 1초 단축'}};
 const weapons={pistol:{name:'PX-0 권총',damage:12,rate:2,range:470,mag:12,reload:1.4,pellets:1,color:'#8defff'},shotgun:{name:'KRAK-12 샷건',damage:11,rate:.8,range:250,mag:5,reload:2.2,pellets:7,color:'#ffbe70'},sword:{name:'SCRAP-7 절단검',damage:34,rate:1.3,range:82,mag:0,reload:0,pellets:0,color:'#ff708d'}};
-const p={x:safe.x,y:safe.y,r:17,hp:100,maxHp:100,face:-Math.PI/2,weapon:'pistol',owned:['pistol'],ammo:{pistol:12,shotgun:5},reload:0,fire:0,melee:0,dash:0,dashTime:0,dashX:0,dashY:0,boost:0,shield:0,hack:0,shot:0,mods:[],cyber:[],chip:null,core:null,bag:[],scrap:0,kills:0,dead:false,deathTime:0};
+const p={x:start.x,y:start.y,r:17,hp:100,maxHp:100,face:-Math.PI/2,weapon:'pistol',owned:['pistol'],ammo:{pistol:12,shotgun:5},reload:0,fire:0,melee:0,dash:0,dashTime:0,dashX:0,dashY:0,boost:0,shield:0,hack:0,shot:0,mods:[],cyber:[],chip:null,core:null,bag:[],scrap:0,kills:0,dead:false,deathTime:0};
 let enemies=[],bullets=[],drops=[],particles=[],time=0,spawn=1,wave=1,noticeUntil=0,aim={x:1,y:0},aimPoint=null,move={x:0,y:0},heldShoot=false,inventoryOpen=false;
 const keys=new Set();const rand=(a,b)=>a+Math.random()*(b-a), clamp=(v,a,b)=>Math.max(a,Math.min(b,v)),dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 function resize(){dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=W*dpr;canvas.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener('resize',resize);resize();
@@ -19,7 +28,7 @@ function current(){return weapons[p.weapon]}
 function has(id){return p.mods.includes(id)||p.cyber.includes(id)||p.chip===id||p.core===id}
 function nearest(range,filter=()=>true){let best=null,d=range;for(const e of enemies){let v=dist(p,e);if(v<d&&filter(e)){d=v;best=e}}return best}
 function shoot(){if(p.dead||inventoryOpen||p.fire>0||p.reload>0)return;let w=current();if(w===weapons.sword){melee();return}if(p.ammo[p.weapon]<=0){p.reload=w.reload;notice('재장전 중');return}p.ammo[p.weapon]--;p.fire=1/w.rate/(p.boost>0&&has('reflex')?1.3:1);p.shot++;let angle=p.face;
-for(let i=0;i<w.pellets;i++){let a=angle+(w.pellets>1?rand(-.26,.26):rand(-.025,.025));bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*720,vy:Math.sin(a)*720,life:w.range/720,damage:w.damage*(has('powder')?1.2:1),kind:p.weapon,shock:has('conduct')&&p.shot%5===0,ignite:has('ignite')&&p.weapon==='shotgun',boost:p.shield>0&&has('thruster')?1.25:1})}p.shield=0;if(!p.ammo[p.weapon])p.reload=w.reload}
+for(let i=0;i<w.pellets;i++){let a=angle+(w.pellets>1?rand(-.26,.26):0);bullets.push({x:p.x+Math.cos(a)*22,y:p.y+Math.sin(a)*22,height:53,vx:Math.cos(a)*Math.cos(lookPitch)*2400,vy:Math.sin(a)*Math.cos(lookPitch)*2400,vheight:Math.sin(lookPitch)*2400,life:w.range/2400,damage:w.damage*(has('powder')?1.2:1),kind:p.weapon,shock:has('conduct')&&p.shot%5===0,ignite:has('ignite')&&p.weapon==='shotgun',boost:p.shield>0&&has('thruster')?1.25:1})}p.shield=0;if(!p.ammo[p.weapon])p.reload=w.reload}
 function melee(){if(p.dead||inventoryOpen||p.melee>0)return;p.melee=.6;let hit=0;for(const e of [...enemies]){let a=Math.atan2(e.y-p.y,e.x-p.x),delta=Math.atan2(Math.sin(a-p.face),Math.cos(a-p.face));if(dist(p,e)<90&&Math.abs(delta)<1.15){hurtEnemy(e,p.weapon==='sword'?34*(e.bleed>0?1.2:1):21,'melee');hit++}}burst(p.x+Math.cos(p.face)*40,p.y+Math.sin(p.face)*40,'#ff9cba',6);if(hit)notice(`근접 공격 ${hit}회 적중`)}
 function hack(){if(p.dead||inventoryOpen||p.hack>0)return;let e=nearest(245,e=>!inSafe(e.x,e.y));if(!e){notice('해킹 범위에 적이 없어');return}p.hack=7;e.stun=3;e.shock=has('overload')?4:0;burst(e.x,e.y,'#68e8ff',18);notice(has('overload')?'해킹 성공 · 감전':'해킹 성공 · 3초 정지')}
 function dash(){if(p.dead||inventoryOpen||p.dash>0)return;let d=movement();if(!d.x&&!d.y){d={x:Math.cos(p.face),y:Math.sin(p.face)}}p.dashX=d.x;p.dashY=d.y;p.dashTime=.19;p.dash=5;p.boost=1;p.shield=1;burst(p.x,p.y,'#8defff',8)}
@@ -34,13 +43,23 @@ $('#inventoryContent').addEventListener('click',e=>{let b=e.target.closest('butt
 function inventory(){inventoryOpen=!inventoryOpen;$('#inventory').classList.toggle('open',inventoryOpen);if(inventoryOpen)renderInventory()};$('#inventoryButton').onclick=inventory;$('#closeInventory').onclick=inventory;$('#lootButton').onclick=pickup;
 const actions={shoot,melee,hack,dash,swap,interact:pickup};for(let [id,fn] of Object.entries(actions)){let b=$('#'+id);b.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();b.setPointerCapture(ev.pointerId);if(id==='shoot')heldShoot=true;fn()});if(id==='shoot'){b.addEventListener('pointerup',()=>heldShoot=false);b.addEventListener('pointercancel',()=>heldShoot=false)}}
 addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();keys.add(e.code);if(e.repeat)return;if(e.code==='KeyJ')melee();if(e.code==='KeyK')hack();if(e.code==='Space')dash();if(e.code==='KeyQ')swap();if(e.code==='KeyE')pickup();if(e.code==='KeyI')inventory()});addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>{keys.clear();heldShoot=false;move.x=move.y=0});
-let stickId=null;const stick=$('#stick');function stickMove(e){let r=stick.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,m=Math.min(1,Math.hypot(dx,dy)/(r.width*.38)),a=Math.atan2(dy,dx);move.x=Math.cos(a)*m;move.y=Math.sin(a)*m;$('#knob').style.transform=`translate(${move.x*r.width*.28}px,${move.y*r.height*.28}px)`}stick.addEventListener('pointerdown',e=>{e.preventDefault();stickId=e.pointerId;stick.setPointerCapture(stickId);stickMove(e)});stick.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e)});function stopStick(e){if(e.pointerId===stickId){stickId=null;move.x=move.y=0;$('#knob').style.transform=''}}stick.addEventListener('pointerup',stopStick);stick.addEventListener('pointercancel',stopStick);
+let stickId=null;const stick=$('#stick');function stickMove(e){let r=stick.getBoundingClientRect(),dx=e.clientX-r.left-r.width/2,dy=e.clientY-r.top-r.height/2,m=Math.min(1,Math.hypot(dx,dy)/(r.width*.38)),a=Math.atan2(dy,dx);move.x=Math.cos(a)*m;move.y=Math.sin(a)*m;$('#knob').style.transform=`translate(calc(-50% + ${move.x*r.width*.28}px),calc(-50% + ${move.y*r.height*.28}px))`}stick.addEventListener('pointerdown',e=>{e.preventDefault();stickId=e.pointerId;stick.setPointerCapture(stickId);stickMove(e)});stick.addEventListener('pointermove',e=>{if(e.pointerId===stickId)stickMove(e)});function stopStick(e){if(e.pointerId===stickId){stickId=null;move.x=move.y=0;$('#knob').style.transform='translate(-50%,-50%)'}}stick.addEventListener('pointerup',stopStick);stick.addEventListener('pointercancel',stopStick);
 let lookPitch=-.035,lookPointer=null,lookX=0,lookY=0;
-function look(dx,dy){if(inventoryOpen||p.dead)return;p.face+=clamp(dx,-80,80)*.004;lookPitch=clamp(lookPitch-clamp(dy,-80,80)*.0028,-.42,.42)}
+function look(dx,dy){if(inventoryOpen||p.dead)return;p.face+=clamp(dx,-80,80)*.004*controlSettings.look;lookPitch=clamp(lookPitch-clamp(dy,-80,80)*.0028*controlSettings.look,-.42,.42)}
 canvas.addEventListener('pointermove',e=>{if(e.pointerType==='mouse')look(e.movementX,e.movementY);else if(e.pointerId===lookPointer){look(e.clientX-lookX,e.clientY-lookY);lookX=e.clientX;lookY=e.clientY}});
 canvas.addEventListener('pointerdown',e=>{e.preventDefault();if(e.pointerType==='mouse'){heldShoot=true;shoot()}else{lookPointer=e.pointerId;lookX=e.clientX;lookY=e.clientY;canvas.setPointerCapture(e.pointerId)}});
 canvas.addEventListener('pointerup',e=>{if(e.pointerId===lookPointer)lookPointer=null;else heldShoot=false});canvas.addEventListener('pointercancel',e=>{if(e.pointerId===lookPointer)lookPointer=null;heldShoot=false});
 function movement(){let strafe=move.x+(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),forward=-move.y+(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),length=Math.hypot(strafe,forward);return length?{x:(Math.cos(p.face)*forward-Math.sin(p.face)*strafe)/length,y:(Math.sin(p.face)*forward+Math.cos(p.face)*strafe)/length}:{x:0,y:0}}
+const controlDefaults={size:112,left:16,bottom:18,look:1};let controlSettings={...controlDefaults};
+try{let saved=JSON.parse(localStorage.getItem('cyber-city-controls-v1')||'{}');for(let k in controlDefaults)if(Number.isFinite(+saved[k]))controlSettings[k]=+saved[k]}catch{}
+const sliders={size:$('#stickSize'),left:$('#stickLeft'),bottom:$('#stickBottom'),look:$('#lookSpeed')};
+function applySettings(){let s=controlSettings;s.size=clamp(s.size,84,170);s.left=clamp(s.left,8,Math.max(8,innerWidth-s.size-8));s.bottom=clamp(s.bottom,8,Math.max(8,innerHeight-s.size-8));s.look=clamp(s.look,.4,2.5);document.documentElement.style.setProperty('--stick-size',s.size+'px');document.documentElement.style.setProperty('--stick-left',s.left+'px');document.documentElement.style.setProperty('--stick-bottom',s.bottom+'px');for(let k in sliders){let e=sliders[k];if(document.activeElement!==e)e.value=s[k];$('#value'+k).textContent=k==='look'?s[k].toFixed(1)+'배':Math.round(s[k])+'px'}}
+for(let [k,e] of Object.entries(sliders))e.addEventListener('input',()=>{controlSettings[k]=+e.value;applySettings();try{localStorage.setItem('cyber-city-controls-v1',JSON.stringify(controlSettings))}catch{}});
+$('#settingsButton').onclick=()=>{$('#settings').classList.add('open');applySettings()};$('#closeSettings').onclick=()=>$('#settings').classList.remove('open');
+$('#resetSettings').onclick=()=>{controlSettings={...controlDefaults};document.activeElement.blur();applySettings();try{localStorage.setItem('cyber-city-controls-v1',JSON.stringify(controlSettings))}catch{}};
+addEventListener('resize',applySettings);applySettings();
+const mini=$('#minimap'),mctx=mini.getContext('2d');
+function drawMap(){const k=mini.width/world.w,l=mini.height/world.h;mctx.fillStyle='#071322e5';mctx.fillRect(0,0,mini.width,mini.height);mctx.fillStyle='#324b63';for(let w of walls)mctx.fillRect(w.x*k,w.y*l,w.w*k,w.h*l);mctx.strokeStyle='#53dd91';mctx.beginPath();mctx.arc(safe.x*k,safe.y*l,Math.max(3,safe.r*k),0,Math.PI*2);mctx.stroke();mctx.fillStyle='#f16b8a';for(let e of enemies){mctx.beginPath();mctx.arc(e.x*k,e.y*l,2.3,0,Math.PI*2);mctx.fill()}mctx.fillStyle='#7deeff';mctx.beginPath();mctx.arc(p.x*k,p.y*l,3.8,0,Math.PI*2);mctx.fill();mctx.strokeStyle='#7deeff';mctx.beginPath();mctx.moveTo(p.x*k,p.y*l);mctx.lineTo((p.x+65*Math.cos(p.face))*k,(p.y+65*Math.sin(p.face))*l);mctx.stroke()}
 function burst(x,y,color,n){for(let i=0;i<n;i++)particles.push({x,y,vx:rand(-120,120),vy:rand(-120,120),life:rand(.2,.65),max:.65,color})}
 function die(){p.dead=true;p.deathTime=3;$('#respawn').classList.add('open');$('#respawnButton').disabled=true;notice('신호 소실')}
 $('#respawnButton').onclick=()=>{if(p.deathTime>0)return;p.dead=false;p.hp=p.maxHp;p.x=safe.x;p.y=safe.y;p.dash=p.hack=0;enemies=[];bullets=[];for(let i=0;i<5;i++)spawnEnemy();$('#respawn').classList.remove('open');notice('LOW-01 은신처로 복귀')};
@@ -49,7 +68,10 @@ if(p.dead){p.deathTime=Math.max(0,p.deathTime-dt);$('#timer').textContent=p.deat
 for(let k of ['fire','melee','dash','dashTime','boost','shield','hack'])p[k]=Math.max(0,p[k]-dt);if(p.reload>0){p.reload-=dt;if(p.reload<=0){p.reload=0;p.ammo[p.weapon]=current().mag}}let d=movement();if(d.x||d.y){advance(p,d.x*185*dt,d.y*185*dt,p.r)}if(p.dashTime>0)advance(p,p.dashX*790*dt,p.dashY*790*dt,p.r);if(heldShoot||keys.has('KeyF'))shoot();
 spawn-=dt;if(spawn<=0&&enemies.length<Math.min(6+Math.floor(p.kills/7),15)){spawnEnemy();spawn=Math.max(.65,2.4-p.kills*.018)}wave=1+Math.floor(p.kills/10);
 for(let e of [...enemies]){e.hit=Math.max(0,e.hit-dt);e.stun=Math.max(0,e.stun-dt);e.shock=Math.max(0,e.shock-dt);e.bleed=Math.max(0,e.bleed-dt);e.burn=Math.max(0,e.burn-dt);e.tick+=dt;if(e.tick>=1){e.tick=0;if(e.burn>0||e.bleed>0){hurtEnemy(e,(e.burn>0?4:0)+(e.bleed>0?3:0),'dot');if(!enemies.includes(e))continue}}if(e.stun>0||inSafe(e.x,e.y))continue;let len=dist(e,p);if(len>e.r+p.r+4){let dx=(p.x-e.x)/len,dy=(p.y-e.y)/len;let nx=e.x+dx*e.speed*dt,ny=e.y+dy*e.speed*dt;if(!inSafe(nx,ny))advance(e,dx*e.speed*dt,dy*e.speed*dt,e.r)}else if(p.shield<=0&&!inSafe(p.x,p.y)){p.hp=Math.max(0,p.hp-e.damage*dt*.75);if(p.hp<=0)die()}}
-for(let b of [...bullets]){b.x+=b.vx*dt;b.y+=b.vy*dt;b.life-=dt;if(b.life<=0||wallHit(b.x,b.y,2)){bullets.splice(bullets.indexOf(b),1);continue}for(let e of [...enemies]){if(dist(b,e)<e.r+4){let close=dist(p,e)<105;hurtEnemy(e,b.damage*b.boost*(b.kind==='shotgun'&&close?1.3:1),'bullet');if(b.shock)e.shock=4;if(b.ignite&&close)e.burn=4;bullets.splice(bullets.indexOf(b),1);burst(b.x,b.y,'#8df2ff',3);break}}}
+for(let b of [...bullets]){let removed=false;for(let step=0;step<4;step++){b.x+=b.vx*dt/4;b.y+=b.vy*dt/4;b.height+=b.vheight*dt/4;
+ if(b.height<0||b.height>360||b.x<0||b.y<0||b.x>world.w||b.y>world.h||wallHit(b.x,b.y,2)){removed=true;break}
+ for(let e of [...enemies]){if(dist(b,e)<e.r+4&&b.height>=0&&b.height<(e.brute?75:55)){let close=dist(p,e)<105;hurtEnemy(e,b.damage*b.boost*(b.kind==='shotgun'&&close?1.3:1),'bullet');if(b.shock)e.shock=4;if(b.ignite&&close)e.burn=4;burst(b.x,b.y,'#8df2ff',3);removed=true;break}}if(removed)break}
+ b.life-=dt;if(removed||b.life<=0)bullets.splice(bullets.indexOf(b),1)}
 $('#hpText').textContent=`HP ${Math.ceil(p.hp)} / ${p.maxHp}`;$('#hpBar').style.width=`${p.hp}%`;$('#equipment').textContent=`${current().name} · ${current().mag?p.reload>0?'재장전':p.ammo[p.weapon]+'/'+current().mag:'근접'} · 모듈 ${p.mods.length}/2`;$('#scrap').textContent=p.scrap;$('#kills').textContent=`처치 ${p.kills} · 웨이브 ${wave}`;$('#dash').innerHTML=`대시<small>${p.dash?p.dash.toFixed(1)+'초':'Space'}</small>`;$('#hack').innerHTML=`해킹<small>${p.hack?p.hack.toFixed(1)+'초':'K'}</small>`;
 }
 // First-person perspective rendered with Canvas 2D for browsers without WebGL.
@@ -87,18 +109,18 @@ function paintWorld(){let bg=ctx.createLinearGradient(0,0,0,H);bg.addColorStop(0
 function nearWall(w){return Math.hypot(Math.max(w.x-p.x,0,p.x-w.x-w.w),Math.max(w.y-p.y,0,p.y-w.y-w.h))<105}
 function paintActors(){surfaces.length=0;
  cube3(safe.x,safe.y,110,92,12,['#326479','#255064','#184052']);
- for(let i=0;i<walls.length;i++){let w=walls[i],h=170+i%4*42,fade=nearWall(w)?.24:1;
+ for(let i=0;i<walls.length;i++){let w=walls[i],h=170+w.id%4*42,fade=nearWall(w)?.24:1;
  cube3(w.x+w.w/2,w.y+w.h/2,w.w,w.h,h,i%2?['#344b62','#182b42','#243852']:['#2b405b','#253952','#172b43'],0,fade);
  cube3(w.x+w.w/2,w.y+w.h/2,w.w+3,w.h+3,5,i%2?['#ba62a1','#6e3b72','#753858']:['#53d9e9','#286f91','#258ca1'],h,fade);
  for(let j=0;j<Math.min(6,Math.floor(w.w/45));j++)cube3(w.x+25+j*42,w.y+w.h+1,18,2,14,['#6be6ee','#3a7c99','#309cb5'],h*.52,fade)}
  for(let e of enemies){let c=e.hit?['#ffe1ec','#a8859b','#bd98ac']:e.stun?['#7af5ff','#35abc0','#2885a3']:e.brute?['#ca7085','#793b58','#a64d69']:['#ee729b','#8e345c','#b34873'];cube3(e.x,e.y,e.r*2,e.r*2,e.brute?75:55,c)}
  for(let d of drops)cube3(d.x,d.y,18,18,18,d.kind==='weapon'?['#ffe29a','#b67a33','#c78b47']:['#9affef','#2f9c9c','#3cbbbc'],10+Math.sin(time*4+d.x)*5);
- for(let b of bullets)cube3(b.x,b.y,6,6,7,['#efffff','#9ce6ef','#84cadb'],20);
+ for(let b of bullets)cube3(b.x,b.y,6,6,7,['#efffff','#9ce6ef','#84cadb'],b.height);
  surfaces.sort((a,b)=>b.depth-a.depth);for(let s of surfaces){ctx.globalAlpha=s.alpha;polygon(s.pts,s.color,s.stroke)}ctx.globalAlpha=1;
  for(let e of enemies){let v=project(e.x,e.brute?95:76,e.y);if(v){let w=e.brute?40:32;ctx.fillStyle='#07101b';ctx.fillRect(v.x-w/2,v.y,w,5);ctx.fillStyle=e.shock>0?'#7feeff':'#f07799';ctx.fillRect(v.x-w/2,v.y,w*Math.max(0,e.hp/e.max),5)}}
  for(let o of particles){let v=project(o.x,30+o.life*25,o.y);if(v){ctx.globalAlpha=Math.max(0,o.life/o.max);ctx.fillStyle=o.color;ctx.fillRect(v.x,v.y,4,4)}}ctx.globalAlpha=1}
 function draw(){camera3D();paintWorld();paintActors()}
 
-let prev=performance.now();function frame(now){let dt=Math.min(.034,(now-prev)/1000);prev=now;update(dt);draw();requestAnimationFrame(frame)}for(let i=0;i<5;i++)spawnEnemy();renderInventory();notice('LOW-01 · 적을 처치하고 부품을 수집해');requestAnimationFrame(frame);
+let prev=performance.now();function frame(now){let dt=Math.min(.034,(now-prev)/1000);prev=now;update(dt);draw();drawMap();requestAnimationFrame(frame)}for(let i=0;i<5;i++)spawnEnemy();renderInventory();notice('LOW-01 · 적을 처치하고 부품을 수집해');requestAnimationFrame(frame);
 })();
 
